@@ -5,6 +5,7 @@ Credit to the following repositories for their components used to help me build 
 2. https://github.com/puelocesar/android-lib-magick
 3. https://github.com/hagish/love-native-android
 
+
 USAGE:
 For quick ImageMagick Usage in your android app, .....the following instructions are based on none-gradle build
 1. simply copy the "libs" folder to your project folder
