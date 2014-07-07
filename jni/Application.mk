@@ -1,2 +1,2 @@
-APP_ABI := armeabi armeabi-v7a mips
+APP_ABI := all
 APP_PLATFORM := android-8
