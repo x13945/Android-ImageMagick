@@ -2,14 +2,18 @@
 
 ###Introduction
 This Is a multi CPU-architecture port of ImageMagick on Android Platform, this repo provides you with the ".so" files necessary to perform android native processing using the Image Magick library version 6.7.3-0 on Android devices with Armeabi, Armeabi-v7a, Intel x86 or Mips processor CPUs/ABIs.
+
 It also provides the C/C++ code in the ImageMagick Library, its dependant libraries as well as the Android.mk files necessary for rebuilding using the Android Native Development Kit (NDK)
-Within the android application, ImageMagick methods are accessed by use of Jmagick included in the src folder, JMagick is an open source Java interface of ImageMagick. It is implemented in the form of a thin Java Native Interface (JNI) layer into the ImageMagick API. please take a look here http://sourceforge.net/projects/jmagick/
+within the android application, 
+
+ImageMagick methods are accessed by use of Jmagick included in the src folder, JMagick is an open source Java interface of ImageMagick. It is implemented in the form of a thin Java Native Interface (JNI) layer into the ImageMagick API. please take a look here http://sourceforge.net/projects/jmagick/
 PLEASE NOTE: I am not an expert on ImageMagick or Android Native Development, this repo is a result of intensive trial and error to avail to you these much sought after .so files for all CPUs.
 
 
 
 ###USAGE:
 For quick ImageMagick Usage in your android app, .....the following instructions are based on none-gradle build
+
 1.  Simply copy the "libs" folder to your project folder
 2.  Delete the CPU architecture folders of those CPU's architecure's you aren't targetting in the "libs" folder you've just copied.
 3.  Go to "src" and copy "Magick" and "fakeawt", copy these to your "src" folder of your project
@@ -19,6 +23,7 @@ For quick ImageMagick Usage in your android app, .....the following instructions
 
 ###REBUILD:
 If you want to rebuild with your own toolchain/compilers and what not or even maybe add other libraries e.g "Ghostscript" to support for PDF.
+
 1.  Naviagate to "jni" and edit the "android.mk" file accordingly
 2.  Also edit the "application.mk" file accordingly
 3.  using your "Cygwin" or whatever you none Windows guys use, navigate to the project's "jni" folder and run "ndk-build" 
@@ -30,6 +35,7 @@ I successfully added support for JPEG2000 and webp formats, if you manage to add
 
 ###NEED HELP TO:
 If you'd like to contibute i'd look forward to the following improvements:
+
 1.  Compiling and adding Ghostscript to support PDF,
 2.  Compiling and adding JPEG turbo
 3.  Making the final ".so" file smaller using any optimizations you experts know of.
@@ -39,6 +45,7 @@ If it works for you don't forget to star.
 
 ###### Credits
 Credit to the following repositories for their components used to help me build this
+
 1.  https://github.com/lilac/Android-ImageMagick
 2.  https://github.com/puelocesar/android-lib-magick
 3.  https://github.com/hagish/love-native-android
@@ -48,8 +55,13 @@ Credit to the following repositories for their components used to help me build 
 If you feel this repo has been alot of help, or has saved you alot of resources, please support my efforts by sending a donation via paypal to paulasiimwet@gmail.com
 
 Goodluck,
+
 regards,
+
 Paul Asiimwe,
+
 Kampala, Uganda
+
 http://www.google.com/+PaulAsiimwe
+
 http://www.twitter.com/_paulasiimwe
