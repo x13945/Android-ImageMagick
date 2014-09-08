@@ -1,7 +1,7 @@
 #ANDROID-IMAGEMAGICK
 
 ###Introduction
-This Is a multi CPU-architecture port of ImageMagick on Android Platform, this repo provides you with the ".so" files necessary to perform android native processing using the Image Magick library version 6.7.3-0 on Android devices with Armeabi, Armeabi-v7a, Intel x86 or Mips processor CPUs/ABIs.
+This Is a free to use,change and reproduce multi CPU-architecture port of ImageMagick on Android Platform, this repo provides you with the ".so" files necessary to perform android native processing using the Image Magick library version 6.7.3-0 on Android devices with Armeabi, Armeabi-v7a, Intel x86 or Mips processor CPUs/ABIs.
 
 It also provides the C/C++ code in the ImageMagick Library, its dependant libraries as well as the Android.mk files necessary for rebuilding using the Android Native Development Kit (NDK)
 within the android application, 
