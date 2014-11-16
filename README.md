@@ -7,6 +7,7 @@ It also provides the C/C++ code in the ImageMagick Library, its dependant librar
 within the android application, 
 
 ImageMagick methods are accessed by use of Jmagick included in the src folder, JMagick is an open source Java interface of ImageMagick. It is implemented in the form of a thin Java Native Interface (JNI) layer into the ImageMagick API. please take a look here http://sourceforge.net/projects/jmagick/
+To see all features and learn how to use them please check out http://www.jmagick.org/jmagick-doc/
 
 
 
