@@ -52,7 +52,7 @@ Credit to the following repositories for their components used to help me build 
 
 
 ###DONATION:
-If you feel this repo has been alot of help, or has saved you alot of resources, please support my efforts by sending a donation via paypal to paulasiimwet@gmail.com
+If you feel this repo has been alot of help, or has saved you alot of resources, please support efforts to develop more free libraries by sending a donation via paypal to paulasiimwet@gmail.com
 
 Goodluck,
 
