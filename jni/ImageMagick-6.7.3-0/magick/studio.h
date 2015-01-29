@@ -241,7 +241,7 @@ extern int vsnprintf(char *,size_t,const char *,va_list);
 # include <sys/types.h>
 # include <sys/stat.h>
 # if defined(MAGICKCORE_HAVE_FTIME)
-/*# include <sys/timeb.h>*/
+# include <sys/timeb.h>
 # endif
 # if defined(MAGICKCORE_POSIX_SUPPORT)
 #  if defined(MAGICKCORE_HAVE_SYS_NDIR_H) || defined(MAGICKCORE_HAVE_SYS_DIR_H) || defined(MAGICKCORE_HAVE_NDIR_H)

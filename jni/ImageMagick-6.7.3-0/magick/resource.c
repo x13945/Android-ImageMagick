@@ -983,8 +983,8 @@ MagickExport MagickBooleanType ResourceComponentGenesis(void)
   }
 #endif
 #if defined(MAGICKCORE_HAVE_GETDTABLESIZE) && defined(MAGICKCORE_POSIX_SUPPORT)
-  /*if (files < 0)
-    files=(ssize_t) getdtablesize();*/
+  if (files < 0)
+    files=(ssize_t) getdtablesize();
 #endif
   if (files < 0)
     files=64;
