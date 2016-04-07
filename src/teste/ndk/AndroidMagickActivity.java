@@ -1,213 +1,330 @@
 package teste.ndk;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import magick.ImageInfo;
+import magick.MagickException;
+import magick.MagickImage;
+import magick.NoiseType;
+import magick.util.MagickBitmap;
 import android.app.Activity;
-import android.app.Dialog;
-import android.app.ProgressDialog;
+import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
+import android.provider.MediaStore;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
 import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
-import magick.ImageInfo;
-import magick.MagickApiException;
-import magick.MagickException;
-import magick.MagickImage;
-import magick.NoiseType;
-import magick.util.DisplayImageMetaData;
-import magick.util.MagickBitmap;
+import android.widget.AdapterView.OnItemSelectedListener;
 
-import android.util.Log;
-import android.view.*;
+//
+// 2016/04/04 Paul Asiimwe
+//
+public class AndroidMagickActivity extends Activity
+{
+	private static final String LOGTAG = "EffectActivity.java";
+	private static final int REQUEST_CODE_PICK = 1;
+	
+    private Prefs m_Prefs;
+	
+	private String m_ImagePath = null;
+	private MagickImage m_MagickImage = null;
+	private MagickImage m_EffectImage = null;
+	
+	private TextView m_TextEffect;
+	private Spinner m_SpinEffect;
+	private ImageView m_ImageView;
 
-public class AndroidMagickActivity extends Activity {
-	static final int PROGRESS_DIALOG = 0;
-	ProgressDialog progressDialog = null;
-
-	/** Called when the activity is first created. */
+	private ExportDialog m_ExportDialog = null;
+		
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		setContentView(R.layout.main2);
-		// InputStream stream = getResources().openRawResource(R.raw.app_notes);
+		setContentView(R.layout.activity_magick);
 		
+		m_Prefs = new Prefs(this);
 		
-		try {
-			final MagickImage img = new MagickImage(new ImageInfo(
-					"/sdcard/1.jpg"));
+		m_TextEffect = (TextView)findViewById(R.id.textEffect);
+		m_SpinEffect = (Spinner)findViewById(R.id.spinEffect);
+		m_ImageView = (ImageView)findViewById(R.id.imageView);
+		
+		ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+				R.array.effects, android.R.layout.simple_spinner_item);
+		
+		adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		m_SpinEffect.setAdapter(adapter);
+		
+		m_SpinEffect.setOnItemSelectedListener(new OnItemSelectedListener() {
+			public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+				if(m_MagickImage != null){
+					showStatus("Working...");
+					applyEffectAsync(pos);
+				}
+			}
 
-			/*
-			 * ImageView iv = new ImageView(this);
-			 * iv.setImageBitmap(MagickBitmap.ToBitmap(img));
-			 * setContentView(iv);
-			 */
-//			setContentView(R.layout.main);
-			Spinner s = (Spinner) findViewById(R.id.spinner);
-			ArrayAdapter adapter = ArrayAdapter.createFromResource(this,
-					R.array.effects, android.R.layout.simple_spinner_item);
-			adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-			s.setAdapter(adapter);
+			public void onNothingSelected(AdapterView<?> parent) {
+			}
+		});
+		
+		// restore current image if needed:
+		if(savedInstanceState != null)
+			m_ImagePath = m_Prefs.getImagePath();
 			
-			s.setOnItemSelectedListener(new OnItemSelectedListener() {
-
-				public void onItemSelected(AdapterView<?> parent, View view,
-						int pos, long id) {
-					ProgressThread t = new ProgressThread(img, pos);
-					//runOnUiThread(t);
-					t.run();
-				}
-
-				public void onNothingSelected(AdapterView<?> parent) {
-					// Do nothing.
-				}
-			});
-			ImageView iv = (ImageView) findViewById(R.id.imageView);
-			iv.setImageBitmap(MagickBitmap.ToBitmap(img));
-		} catch (MagickApiException e) {
-			e.printStackTrace();
-		} catch (MagickException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		showStatus("");
+		enableUI(true);
+	}
+	
+	@Override
+	public void onStart()
+	{
+		super.onStart();
 		
-		/*
-		 * TextView tv = new TextView(this);
-		 * tv.setText(DisplayImageMetaData.displayMagickImage(img));
-		 * setContentView(tv);
-		 
-		int count = 3;
-		MagickImage images[] = new MagickImage[count];
-		for (int i = 0; i < count; i++) {
-			String path = "/sdcard/" + String.valueOf(i + 1) + ".jpg";
-			try {
-				images[i] = new MagickImage(new ImageInfo(path));
-			} catch (MagickException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+		if(m_ImagePath != null){
+			showStatus("Loading image...");
+			loadImage();
 		}
+	}
+	
+	@Override
+	public void onStop()
+	{
+		// store current imge path:
+		if(m_ImagePath != null)
+			m_Prefs.setImagePath(m_ImagePath);
+		
+		super.onStop();
+	}
+	
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu; this adds items to the action bar if it is present:
+		getMenuInflater().inflate(R.menu.teste_ndk, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// if UI active:
+		if(m_SpinEffect.isEnabled() == true){
+			// Handle action bar item clicks: 
+			int id = item.getItemId();
+			
+			if(id == R.id.load) {
+				pickImage();
+				return true;
+			}
+			
+		}
+		return super.onOptionsItemSelected(item);
+	}
+	
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent intent)
+	{
+		Log.d(LOGTAG, "onActivityResult()");
+		super.onActivityResult(requestCode, resultCode, intent);
+		
+		switch(requestCode){
+		case REQUEST_CODE_PICK:
+			if(resultCode == RESULT_OK){
+				Uri targetUri = intent.getData();
+				m_ImagePath = getRealPathFromUri(targetUri);
+				loadImage();
+			}
+			else{
+				showStatus("");
+				enableUI(true);
+			}
+			break;
+		}
+	}
+	
+	private void pickImage()
+	{
+		Intent loadPicture = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+		startActivityForResult(loadPicture, REQUEST_CODE_PICK);
+	}
+	
+	private void loadImage()
+	{
+		Log.d(LOGTAG, "loadImage()");
+		enableUI(false);
+		
+		new AsyncTask<Void, Void, Bitmap>() 
+		{
+            @Override
+            protected Bitmap doInBackground(Void... voids) {
+            	Bitmap bitmap = null;
+            	
+            	if(m_ImagePath != null){
+            		try{
+            	      	if((m_MagickImage = new MagickImage(new ImageInfo(m_ImagePath))) != null) 
+            	      		bitmap = MagickBitmap.ToBitmap(m_MagickImage);
+            	      	// set as effect image, too:
+            	      	m_EffectImage = m_MagickImage;
+            		} catch (MagickException e) {
+            			Log.w(LOGTAG, "image create", e);
+            			m_EffectImage = null;
+            			return null;
+            		}
+            	}	
+            	
+            	return bitmap;
+            }
+
+            @Override
+            protected void onPostExecute(Bitmap bitmap)
+            {
+            	enableUI(true);
+            	if(bitmap != null){
+            		// set no effect:
+            		m_SpinEffect.setSelection(0);
+            		// show image:
+            		m_ImageView.setImageBitmap(bitmap);
+            		showStatus("Load ok");
+            		Log.d(LOGTAG, "Load success");
+            	}
+            	else{
+            		showStatus("Load failed");
+            		Log.d(LOGTAG, "Load failed");
+            	}
+            }
+        }.execute();
+	}
+	
+	private void applyEffectAsync(final int pos)
+	{
+		Log.d(LOGTAG, "applyEffectAsync()");
+		enableUI(false);
+		
+		new AsyncTask<Void, Void, Bitmap>() 
+		{
+            @Override
+            protected Bitmap doInBackground(Void... voids) {
+            	if(m_MagickImage != null)
+            		return applyEffect(pos);
+            	else
+            		return null;
+            }
+
+            @Override
+            protected void onPostExecute(Bitmap bitmap)
+            {
+            	enableUI(true);
+            	
+            	if(bitmap != null){
+            		// show modified image:
+            		m_ImageView.setImageBitmap(bitmap);
+            		showStatus("Done");
+            		Log.d(LOGTAG, "Effect success");
+            	}
+            	else{
+            		showStatus("Effect failed");
+            		Log.d(LOGTAG, "Effect failed");
+            	}
+            }
+        }.execute();
+	}
+	
+	private Bitmap applyEffect(int pos)
+	{
+		int effect = 0;
+		Bitmap bitmap = null;
+		m_EffectImage = null;
+		
 		try {
-			MagickImage image = new MagickImage(images);
-			image.setImageFormat("gif");
-			String fn = Environment.getExternalStorageDirectory() + "/Pictures/test.gif";
-			image.setFileName(fn);
-			ImageInfo info = new ImageInfo(fn);
-			info.setMagick("gif");
-			//image.writeImage(info);
-			byte blob[] = image.imageToBlob(info);
-			FileOutputStream fos = new FileOutputStream(fn);
-			fos.write(blob);
-			fos.close();
-			FileOutputStream testOS = new FileOutputStream("/mnt/sdcard/test.txt");
-			testOS.write("abc".getBytes());
-			testOS.close();
-		} catch (MagickException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
-	}
-
-	protected Dialog onCreateDialog(int id, Bundle bundle) {
-		switch (id) {
-		case PROGRESS_DIALOG:
-			/*
-			 * ProgressDialog dialog =
-			 * ProgressDialog.show(AndroidMagickActivity.this, "",
-			 * "Loading. Please wait...", true);
-			 */
-			progressDialog = new ProgressDialog(AndroidMagickActivity.this);
-			progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-			progressDialog.setMessage("Loading...");
-			return progressDialog;
-			// return dialog;
-		default:
-			return null;
+		switch (pos) {
+		case 0:
+			m_EffectImage = m_MagickImage;
+			break;
+		case 1:
+			effect = NoiseType.UndefinedNoise;
+			break;
+		case 2:
+			effect = NoiseType.UniformNoise;
+			break;
+		case 3:
+			effect = NoiseType.GaussianNoise;
+			break;
+		case 4:
+			effect = NoiseType.MultiplicativeGaussianNoise;
+			break;
+		case 5:
+			effect = NoiseType.ImpulseNoise;
+			break;
+		case 6:
+			effect = NoiseType.LaplacianNoise;
+			break;
+		case 7:
+			effect = NoiseType.PoissonNoise;
+			break;
+		case 8:
+			m_EffectImage = m_MagickImage.blurImage(5, 1);
+			break;
+		case 9:
+			m_EffectImage = m_MagickImage.charcoalImage(5, 1);
+			break;
+		case 10:
+			m_EffectImage = m_MagickImage.edgeImage(0);
+			break;
 		}
-	}
-
-
-	/** Nested class that performs progress calculations (counting) */
-	private class ProgressThread extends Thread {
 		
-		MagickImage img;
-		int pos;
-
-		ProgressThread(MagickImage image, int pos) {
-			this.img = image;
-			this.pos = pos;
-			run();
+		if(m_EffectImage == null)
+			m_EffectImage = m_MagickImage.addNoiseImage(effect);
+		
+		// if all else fails, default to original image:
+		if(m_EffectImage == null)
+			m_EffectImage = m_MagickImage;
+			
+		bitmap = MagickBitmap.ToBitmap(m_EffectImage);
+		
+		} catch (MagickException e) {
+			Log.w(LOGTAG, "applyEffect()", e);
+			bitmap = null;
 		}
 
-		public void run() {
-			int effect = 0;
-			AndroidMagickActivity.this.showDialog(PROGRESS_DIALOG);
-			switch (pos) {
-			case 1:
-				effect = NoiseType.UndefinedNoise;
-				break;
-			case 2:
-				effect = NoiseType.UniformNoise;
-				break;
-			case 3:
-				effect = NoiseType.GaussianNoise;
-				break;
-			case 4:
-				effect = NoiseType.MultiplicativeGaussianNoise;
-				break;
-			case 5:
-				effect = NoiseType.ImpulseNoise;
-				break;
-			case 6:
-				effect = NoiseType.LaplacianNoise;
-				break;
-			case 7:
-				effect = NoiseType.PoissonNoise;
-				break;
+		return bitmap;
+	}
+	
+	private String getRealPathFromUri(Uri contentUri)
+	{
+		String path = null;
+		String scheme = contentUri.getScheme();
+		
+		if(scheme.equals("content")){
+			String[] proj = { MediaStore.Images.Media.DATA };
+			Cursor cursor = MediaStore.Images.Media.query(getContentResolver(), contentUri, proj, null, null, null);
+			int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+			
+			if(cursor != null){
+				if(cursor.moveToFirst() == true)
+					path = cursor.getString(column_index);
+				cursor.close();
 			}
-			Bitmap bitmap = null;
-			try {
-				ImageView iv = (ImageView) findViewById(R.id.imageView);
-
-				MagickImage image = null;
-				if (pos < 8)
-					image = img.addNoiseImage(effect);
-				else if (pos == 9)
-					image = img.blurImage(5, 1);
-				else if (pos == 10)
-					image = img.charcoalImage(5, 1);
-				else if (pos == 11)
-					image = img.edgeImage(0);
-				if (image != null) {
-
-					bitmap = MagickBitmap.ToBitmap(image);
-					iv.setImageBitmap(bitmap);
-				}
-				// bitmap.recycle(); we can't do that.
-				AndroidMagickActivity.this.dismissDialog(PROGRESS_DIALOG);
-			} catch (MagickException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-
+			
+			cursor = null;
 		}
+		else if(scheme.equals("file"))
+			path = contentUri.getPath();
 
+		return path;
 	}
 
+	private void showStatus(String status)
+	{
+		m_TextEffect.setText(status);
+	}
+	
+	private void enableUI(boolean enable)
+	{
+		m_SpinEffect.setEnabled(enable);
+	}
 }

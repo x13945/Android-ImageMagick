@@ -2,6 +2,9 @@
     <resources>
         <string-array name="effects">
         	<item>No Effect</item>
+        	<!-- 2016/04/04 D.Slamnig added -->
+        	<item>Undefined Noise</item>
+        	<!--  -->
             <item>Uniform Noise</item>
             <item>Gaussian Noise</item>
             <item>Multiplicative Gaussian Noise</item>
@@ -12,4 +15,28 @@
             <item>Charcoal</item>
             <item>Edge</item>
         </string-array>
+        
+        <!-- 2016/04/05 D.Slamnig added -->
+        <string-array name="formats">
+            <item>ai</item>
+            <item>bmp</item>
+            <item>bw</item>
+            <item>dds</item>
+            <item>epdf</item>
+            <item>epi</item>
+            <item>eps</item>
+            <item>epsf</item>
+            <item>gif</item>
+            <item>info</item>
+            <item>jpg</item>
+            <item>mat</item>
+            <item>mpc</item>
+            <item>pcl</item>
+            <item>pdf</item>
+            <item>png</item>
+            <item>ps</item>
+            <item>ps2</item>
+            <item>ps3</item>
+            <item>svg</item>
+     	</string-array>
     </resources>

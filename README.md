@@ -56,7 +56,7 @@ Please note that there are no specific differences between the code used to buil
 
 
 ###DONATION:
-If you feel this repo has been alot of help, or has saved you alot of resources, please support efforts to develop more free libraries by sending a donation via paypal to paulasiimwet@gmail.com
+If you feel this repo has been alot of help, or has saved you alot of resources, please buy me a beer :-) via paypal to paulasiimwet@gmail.com
 
 Goodluck,
 
