@@ -6,6 +6,10 @@
         android:showAsAction="always"
         android:title="Load"/>
     
-    
+    <item
+        android:id="@+id/save"
+        android:orderInCategory="100"
+        android:showAsAction="always"
+        android:title="Save"/>
 
 </menu>

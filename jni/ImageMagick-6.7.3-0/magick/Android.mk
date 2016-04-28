@@ -108,7 +108,20 @@ LOCAL_SRC_FILES := PreRvIcccm.c \
 
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/.. /opt/local/include /opt/local/include/freetype2 /usr/local/include/ImageMagick
 LOCAL_CFLAGS += -DHAVE_CONFIG_H
-LOCAL_LDLIBS += -L$(LOCAL_PATH)/../lib -lfreetype -lpng -lz
+
+###############################
+# 2016/04/17 D.Slamnig modified:
+# LOCAL_LDLIBS += -L$(LOCAL_PATH)/../lib -lfreetype -lpng -lz
+LOCAL_LDLIBS += -L$(LOCAL_PATH)/../lib -lfreetype -lpng -lz -llog
+#LOCAL_LDLIBS += -L$(LOCAL_PATH)/../lib -lfreetype -lpng -lz -L$(SYSROOT)/usr/lib -llog
+###############################
+
+
+LOCAL_LDLIBS    := -L$(SYSROOT)/usr/lib -llog
+
+LOCAL_LDLIBS    := -L$(SYSROOT)/usr/lib -llog
+
+
 LOCAL_STATIC_LIBRARIES += png freetype jpeg coders tiff-static filters
 LOCAL_SHARED_LIBRARIES += png freetype jpeg coders tiff-static filters
 

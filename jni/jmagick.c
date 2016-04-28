@@ -7,13 +7,21 @@
 #include <magick/api.h>
 #include "jmagick.h"
 
-
+// 2016/04/17 D.Slamnig added:
+#include <android/log.h>
+#define APPNAME "Magick"
+#define LOG(a) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a);
+#define LOG2(a,b) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a, b);
+#define DIAGNOSTIC 1
 
 /*
  * Convenience function to help throw an MagickException.
  */
 void throwMagickException(JNIEnv *env, const char *mesg)
 {
+	// 2016/04/17 D.Slamnig added:
+	LOG("throwMagickException 1");
+
     jclass magickExceptionClass;
 
     magickExceptionClass = (*env)->FindClass(env, "magick/MagickException");
@@ -33,10 +41,15 @@ void throwMagickException(JNIEnv *env, const char *mesg)
  *   mesg       JMagick message
  *   exception  points to a ImageMagick ExceptionInfo structure
  */
+////////////////////////////////////////
+// 2016/04/17 D.Slamnig modified:
 void throwMagickApiException(JNIEnv *env,
 			     const char *mesg,
 			     const ExceptionInfo *exception)
 {
+	// 2016/04/17 D.Slamnig added:
+	LOG("throwMagickException 2");
+
     jclass magickApiExceptionClass;
     jmethodID consMethodID = 0;
     jobject newObj;
@@ -47,7 +60,9 @@ void throwMagickApiException(JNIEnv *env,
     magickApiExceptionClass =
 	(*env)->FindClass(env, "magick/MagickApiException");
     if (magickApiExceptionClass == 0) {
-	fprintf(stderr, "Cannot find MagickApiException class\n");
+	//fprintf(stderr,
+    LOG(
+    	"Cannot find MagickApiException class\n");
 	return;
     }
 
@@ -64,21 +79,25 @@ void throwMagickApiException(JNIEnv *env,
     jreason = (*env)->NewStringUTF(env, exception->reason);
     if (jreason == NULL) {
 #ifdef DIAGNOSTIC
-	fprintf(stderr,
-		"throwMagickApiException: "
+	//fprintf(stderr,
+	//	"throwMagickApiException: "
+    LOG(
 		"Unable to create reason string\n");
 #endif
-	return;
+    jreason = (*env)->NewStringUTF(env, "no reason");
+	// return;
     }
 
     jdescription = (*env)->NewStringUTF(env, exception->description);
     if (jdescription == NULL) {
 #ifdef DIAGNOSTIC
-	fprintf(stderr,
-		"throwMagickApiException: "
+	//fprintf(stderr,
+	//	"throwMagickApiException: "
+    LOG(
 		"Unable to create description string\n");
 #endif
-	return;
+    jdescription = (*env)->NewStringUTF(env, "no description");
+    // return;
     }
 
     /* Create the MagickApiException object */
@@ -87,20 +106,27 @@ void throwMagickApiException(JNIEnv *env,
                                jreason, jdescription);
     if (newObj == NULL) {
 #ifdef DIAGNOSTIC
-	fprintf(stderr,
-		"throwMagickApiException: "
+	//fprintf(stderr,
+	//	"throwMagickApiException: "
+    LOG(
 		"Unable to create MagickApiException object\n");
 #endif
 	return;
     }
 
+    // 2016/04/17 D.Slamnig added:
+    LOG("throw it");
     /* Throw the exception. */
     result = (*env)->Throw(env, newObj);
 #ifdef DIAGNOSTIC
     if (result != 0) {
-	fprintf(stderr,
-		"throwMagickApiException: "
-		"Fail to throw MagickApiException");
+    	// 2016/04/17 D.Slamnig added:
+    	LOG("throw failed");
+
+		//fprintf(stderr,
+		//	"throwMagickApiException: "
+    	LOG(
+			"Fail to throw MagickApiException");
     }
 #endif
 }

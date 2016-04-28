@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="teste.ndk"
-    android:versionCode="102"
-    android:versionName="1.2" >
+    android:versionCode="105"
+    android:versionName="1.5" >
 
     <!-- 2016/04/03 D.Slamnig raised from 8 to 11: -->
-    <uses-sdk android:minSdkVersion="11" />
+    <!-- 2016/04/26 D.Slamnig raised to 12 for pwrite64: -->
+    <uses-sdk android:minSdkVersion="12" />
     
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 

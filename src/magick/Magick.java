@@ -1,6 +1,9 @@
 package magick;
 
 
+import java.io.File;
+
+import android.content.Context;
 import fakeawt.Rectangle;
 
 
@@ -12,6 +15,12 @@ import fakeawt.Rectangle;
  * @author Eric Yeo
  * @author Max Kollegov &lt;virtual_max@geocities.com&gt;
  */
+////////////////////////////////////////////////////////////////////////////////////////////
+//
+// 2016/04/22 D.Slamnig added support for setting image cache directory (JNI _magick_Cache.c)
+//
+////////////////////////////////////////////////////////////////////////////////////////////
+
 public class Magick {
 
     static {
@@ -65,5 +74,12 @@ public class Magick {
      */
     public static native int parseImageGeometry(String geometry,
                                                 Rectangle rect);
-
+    
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // 2016/04/22 D.Slamnig added support for setting image cache directory (see JNI ...magick_Cache.c)
+    //
+    ////////////////////////////////////////////////////////////////////////////////////////////
+    public static native void setCacheDir(String dir);
+    //
 }

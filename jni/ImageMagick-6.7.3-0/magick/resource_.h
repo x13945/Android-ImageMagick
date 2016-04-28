@@ -56,6 +56,15 @@ extern MagickExport void
   RelinquishMagickResource(const ResourceType,const MagickSizeType),
   ResourceComponentTerminus(void);
 
+///////////////////////////////////////////////////////////////////////////////
+//
+// 2016/04/17 D.Slamnig added:
+//
+extern MagickExport void
+	SetCacheDir(char *szCacheDir);
+//
+////////////////////////////////////////////////////////////////////////////////
+
 #if defined(__cplusplus) || defined(c_plusplus)
 }
 #endif

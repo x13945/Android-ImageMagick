@@ -35,7 +35,11 @@
 %
 %
 */
-
+/////////////////////////////////////////////////////////////
+//
+// 2016/04/22 D.Slamnig modified to check native temp path
+//
+/////////////////////////////////////////////////////////////
 /*
   Include declarations.
 */
@@ -118,6 +122,26 @@ static SemaphoreInfo
 static SplayTreeInfo
   *temporary_resources = (SplayTreeInfo *) NULL;
 
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// 2016/04/17 D.Slamnig added:
+//
+#include <android/log.h>
+#define APPNAME "Magick"
+#define LOG(a) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a);
+#define LOG2(a,b) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a, b);
+
+static char *g_pszCacheDir = NULL;
+
+MagickExport void SetCacheDir(char *szCacheDir)
+{
+	LOG2("SetCacheDir: %s", szCacheDir);
+	g_pszCacheDir = ConstantString(szCacheDir);
+}
+////////////////////////////////////////////////////////////////////////////////
+
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -337,6 +361,11 @@ static void *DestroyTemporaryResources(void *temporary_resource)
   return((void *) NULL);
 }
 
+/////////////////////////////////////////////////////////////
+//
+// 2016/04/22 D.Slamnig modified to check native temp path
+//
+/////////////////////////////////////////////////////////////
 static MagickBooleanType GetPathTemplate(char *path)
 {
   char
@@ -355,10 +384,22 @@ static MagickBooleanType GetPathTemplate(char *path)
     attributes;
 
   (void) CopyMagickString(path,"magick-XXXXXXXX",MaxTextExtent);
-  exception=AcquireExceptionInfo();
-  directory=(char *) GetImageRegistry(StringRegistryType,"temporary-path",
-    exception);
-  exception=DestroyExceptionInfo(exception);
+
+  ////////////////////////////////////////////////////
+  // 2016 D.Slamnig added
+  LOG("GetPathTemplate()");
+  // First check if native cache directory is set:
+  directory = g_pszCacheDir;
+  if(directory != (char *) NULL){
+	  LOG2("Native cache path found: %s", directory);
+  }
+  /////////////////////////////////////////////////////
+  if(directory == (char *) NULL){
+	  exception=AcquireExceptionInfo();
+	  directory=(char *) GetImageRegistry(StringRegistryType,"temporary-path",
+			  exception);
+	  exception=DestroyExceptionInfo(exception);
+  }
   if (directory == (char *) NULL)
     directory=GetEnvironmentValue("MAGICK_TEMPORARY_PATH");
   if (directory == (char *) NULL)
@@ -385,25 +426,36 @@ static MagickBooleanType GetPathTemplate(char *path)
     return(MagickTrue);
   if (strlen(directory) > (MaxTextExtent-15))
     {
-      directory=DestroyString(directory);
+	  LOG("dir too long");
+	  // do not destroy native directory path:
+      //directory=DestroyString(directory);
       return(MagickTrue);
     }
   status=GetPathAttributes(directory,&attributes);
   if ((status == MagickFalse) || !S_ISDIR(attributes.st_mode))
     {
-      directory=DestroyString(directory);
+	  LOG("dir attributes problem");
+      // directory=DestroyString(directory);
       return(MagickTrue);
     }
+
   if (directory[strlen(directory)-1] == *DirectorySeparator)
     (void) FormatLocaleString(path,MaxTextExtent,"%smagick-XXXXXXXX",directory);
   else
     (void) FormatLocaleString(path,MaxTextExtent,"%s%smagick-XXXXXXXX",
       directory,DirectorySeparator);
-  directory=DestroyString(directory);
+
+  // D.Slamnig removed for now:
+  // directory=DestroyString(directory);
+
   if (*DirectorySeparator != '/')
     for (p=path; *p != '\0'; p++)
       if (*p == *DirectorySeparator)
         *p='/';
+  //
+  LOG2("Temp file path: %s", path);
+  //
+
   return(MagickTrue);
 }
 

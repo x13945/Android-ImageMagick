@@ -633,8 +633,10 @@ LOCAL_SRC_FILES := \
 
 LOCAL_LDLIBS    := -L$(SYSROOT)/usr/lib -llog
 
-
-
+###############################
+# 2016/04/17 D.Slamnig added:
+#LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)
+###############################
 
 LOCAL_STATIC_LIBRARIES := \
     libpngo \
@@ -666,6 +668,11 @@ LOCAL_C_INCLUDES  :=  \
 	$(WEBP_SRC_PATH)src \
 	${JASPER_SRC_PATH}src/libjasper/include \
 
+###########################################################################################
+#
+#	2016/04/22 D.Slamnig added support for setting image cache directory (magick_Cache.c)
+#
+###########################################################################################	
 LOCAL_SRC_FILES := \
 	jmagick.c \
 	magick_DrawInfo.c \
@@ -676,7 +683,8 @@ LOCAL_SRC_FILES := \
 	magick_MontageInfo.c \
 	magick_PixelPacket.c \
 	magick_QuantizeInfo.c \
-	magick_MagickBitmap.c
+	magick_MagickBitmap.c \
+	magick_Cache.c
 
 LOCAL_LDLIBS    := -L$(SYSROOT)/usr/lib -llog
 

@@ -36,6 +36,13 @@
 %
 %
 */
+//////////////////////////////////////////////////////////////////////////////
+//
+// 2016/04/20 D.Slamnig modified to store/retrieve maximum severity
+// exception during an operation. Used to throw MagickException in JNI code.
+//
+//////////////////////////////////////////////////////////////////////////////
+
 
 /*
   Include declarations.
@@ -52,6 +59,13 @@
 #include "magick/string_.h"
 #include "magick/utility.h"
 
+
+// 2016/04/17 D.Slamnig added:
+#include <android/log.h>
+// #include <jni.h>
+#define APPNAME "Magick"
+#define LOG(a) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a);
+#define LOG2(a,b) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a, b);
 /*
   Forward declarations.
 */
@@ -79,7 +93,16 @@ static FatalErrorHandler
 
 static WarningHandler
   warning_handler = DefaultWarningHandler;
-
+
+////////////////////////////////
+//
+// 2016/04/20 D.Slamnig added to store maximum exception severity during an operation:
+
+ExceptionInfo m_NativeExceptionInfo;
+// ExceptionType m_MaxSeverity = ExceptionType.UndefinedException;
+
+////////////////////////////////
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -452,20 +475,45 @@ MagickExport void GetExceptionInfo(ExceptionInfo *exception)
 */
 MagickExport char *GetExceptionMessage(const int error)
 {
+  // 2016/04/17 D.Slamnig added:
+  // LOG("GetExceptionMessage enter");
+  //
+
   char
     exception[MaxTextExtent];
 
   *exception='\0';
+
+  // 2016/04/17 D.Slamnig added:
+  // LOG("GetExceptionMessage exception allocated");
+  //
+
+  // for now don't use strerror_r, on Android returns int, not string:
+  (void) CopyMagickString(exception, strerror(error), sizeof(exception));
+  // 2016/04/17 D.Slamnig added:
+  // LOG("CopyMagickString done");
+  //
+/*
 #if defined(MAGICKCORE_HAVE_STRERROR_R)
 #if !defined(_GNU_SOURCE)
+  // 2016/04/17 D.Slamnig added:
+  LOG("branch 1");
+  //
   (void) strerror_r(error,exception,sizeof(exception));
 #else
+  // 2016/04/17 D.Slamnig added:
+    LOG("branch 2");
+  // removed for now:
   (void) CopyMagickString(exception,strerror_r(error,exception,
     sizeof(exception)),sizeof(exception));
 #endif
 #else
+  // 2016/04/17 D.Slamnig added:
+    LOG("branch 3");
+    //
   (void) CopyMagickString(exception,strerror(error),sizeof(exception));
 #endif
+*/
   return(ConstantString(exception));
 }
 
@@ -840,6 +888,60 @@ MagickExport WarningHandler SetWarningHandler(WarningHandler handler)
   warning_handler=handler;
   return(previous_handler);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//
+// 2016/04/20 D.Slamnig added to store maximum severity exception during an operation:
+// private:
+void SetNativeException(ExceptionType severity, char *reason, char *description, size_t signature)
+{
+	m_NativeExceptionInfo.severity = severity;
+	m_NativeExceptionInfo.error_number = 0;
+	m_NativeExceptionInfo.reason = ConstantString(reason);
+	m_NativeExceptionInfo.description = ConstantString(description);
+	m_NativeExceptionInfo.exceptions = NULL;
+	m_NativeExceptionInfo.relinquish = MagickFalse;
+	m_NativeExceptionInfo.semaphore = NULL;
+	m_NativeExceptionInfo.signature = signature;
+}
+
+void AddNativeException(ExceptionInfo *p)
+{
+	if(p->severity > m_NativeExceptionInfo.severity)
+		SetNativeException(p->severity, p->reason, p->description, p->signature);
+}
+
+void AddNativeFatalException(void)
+{
+	SetNativeException(FatalErrorException, "ImageMagick fatal error", NULL, 0);
+}
+
+// exports:
+void ClearNativeException(void)
+{
+	SetNativeException(UndefinedException, NULL, NULL, 0);
+}
+
+ExceptionInfo *GetNativeException(void)
+{
+	return &m_NativeExceptionInfo;
+}
+
+int IsNativeExceptionError(void)
+{
+	return m_NativeExceptionInfo.severity >= ErrorException ? 1 : 0;
+}
+
+int GetNativeExceptionSeverity(void)
+{
+	return (int)m_NativeExceptionInfo.severity;
+}
+
+char *GetNativeExceptionReason(void)
+{
+	return m_NativeExceptionInfo.reason;
+}
+/////////////////////////////////
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -872,6 +974,76 @@ MagickExport WarningHandler SetWarningHandler(WarningHandler handler)
 %    o description: the exception description.
 %
 */
+////////////////////////////////////////
+//
+// 2016/04/19 D.Slamnig modified:
+//
+///////////////////////////////////////
+MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
+  const ExceptionType severity,const char *reason,const char *description)
+{
+  register ExceptionInfo
+    *p;
+
+  //
+  LOG("ThrowException");
+  //
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickSignature);
+
+  p=(ExceptionInfo *) GetLastValueInLinkedList((LinkedListInfo *)
+    exception->exceptions);
+
+  if ((p != (ExceptionInfo *) NULL) && (p->severity == severity) &&
+      (LocaleCompare(exception->reason,reason) == 0) &&
+      (LocaleCompare(exception->description,description) == 0))
+  {
+	  //
+	  LOG("Same as last exception in list");
+	  //
+  	  return(MagickTrue);
+  }
+
+  p=(ExceptionInfo *) AcquireMagickMemory(sizeof(*p));
+  if (p == (ExceptionInfo *) NULL)
+  {
+	  //
+	  LOG("Fatal exception");
+	  AddNativeFatalException();
+	  //
+	  ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  }
+  (void) ResetMagickMemory(p,0,sizeof(*p));
+  p->severity=severity;
+  //
+  LOG2("severity: %d", (int)p->severity);
+  //
+  if (reason != (const char *) NULL){
+	  p->reason=ConstantString(reason);
+	  //
+  	  LOG2("reason: %s", p->reason);
+  	  //
+  }
+  if (description != (const char *) NULL){
+    p->description=ConstantString(description);
+    //
+    LOG2("description: %s", p->description);
+    //
+  }
+  p->signature=MagickSignature;
+  (void) AppendValueToLinkedList((LinkedListInfo *) exception->exceptions,p);
+  exception->severity=p->severity;
+  exception->reason=p->reason;
+  exception->description=p->description;
+
+  //
+  AddNativeException(p);
+  //
+
+  return(MagickTrue);
+}
+
+/*
 MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   const ExceptionType severity,const char *reason,const char *description)
 {
@@ -902,6 +1074,7 @@ MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   exception->description=p->description;
   return(MagickTrue);
 }
+*/
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

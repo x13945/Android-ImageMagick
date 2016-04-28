@@ -1,11 +1,15 @@
 package teste.ndk;
 
+import java.io.File;
+
 import magick.ImageInfo;
+import magick.Magick;
 import magick.MagickException;
 import magick.MagickImage;
 import magick.NoiseType;
 import magick.util.MagickBitmap;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -18,20 +22,24 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.AdapterView.OnItemSelectedListener;
 
 //
-// 2016/04/04 Paul Asiimwe
+// 	2016/04/04 D.Slamnig modified
+//	2016/04/25 D.Slamnig modified
 //
 public class AndroidMagickActivity extends Activity
 {
-	private static final String LOGTAG = "EffectActivity.java";
+	private static final String LOGTAG = "AndroidMagickActivity.java";
 	private static final int REQUEST_CODE_PICK = 1;
+	// Reduce loaded/displayed bitmap to max size:
+	private static final int MAX_BITMAP_DIMENSION = 360; // small for testing
 	
+	private AndroidMagickActivity m_This;
     private Prefs m_Prefs;
 	
 	private String m_ImagePath = null;
@@ -50,8 +58,14 @@ public class AndroidMagickActivity extends Activity
 
 		setContentView(R.layout.activity_magick);
 		
+		m_This = this;
 		m_Prefs = new Prefs(this);
 		
+		Log.d(LOGTAG, "onCreate()");
+		
+		// set image cache temp directory in ImageMagick:
+		AndroidMagick.setCacheDir(this);
+				
 		m_TextEffect = (TextView)findViewById(R.id.textEffect);
 		m_SpinEffect = (Spinner)findViewById(R.id.spinEffect);
 		m_ImageView = (ImageView)findViewById(R.id.imageView);
@@ -87,10 +101,12 @@ public class AndroidMagickActivity extends Activity
 	{
 		super.onStart();
 		
+		/*
 		if(m_ImagePath != null){
 			showStatus("Loading image...");
 			loadImage();
 		}
+		*/
 	}
 	
 	@Override
@@ -121,7 +137,13 @@ public class AndroidMagickActivity extends Activity
 				pickImage();
 				return true;
 			}
-			
+			else if(id == R.id.save) {
+				if(m_EffectImage != null){
+					m_ExportDialog = new ExportDialog(this);
+					m_ExportDialog.show(m_EffectImage);
+				}	
+				return true;
+			}
 		}
 		return super.onOptionsItemSelected(item);
 	}
@@ -130,19 +152,22 @@ public class AndroidMagickActivity extends Activity
 	protected void onActivityResult(int requestCode, int resultCode, Intent intent)
 	{
 		Log.d(LOGTAG, "onActivityResult()");
-		super.onActivityResult(requestCode, resultCode, intent);
 		
 		switch(requestCode){
 		case REQUEST_CODE_PICK:
 			if(resultCode == RESULT_OK){
 				Uri targetUri = intent.getData();
 				m_ImagePath = getRealPathFromUri(targetUri);
+				showStatus("Loading image...");
 				loadImage();
 			}
 			else{
 				showStatus("");
 				enableUI(true);
 			}
+			break;
+		default:
+			super.onActivityResult(requestCode, resultCode, intent);
 			break;
 		}
 	}
@@ -153,6 +178,83 @@ public class AndroidMagickActivity extends Activity
 		startActivityForResult(loadPicture, REQUEST_CODE_PICK);
 	}
 	
+	
+	private Bitmap m_Bitmap = null;
+	
+	// Thread version:
+	private void loadImage()
+	{
+		Log.d(LOGTAG, "loadImage()");
+		enableUI(false);
+	
+		m_Bitmap = null;
+		
+		Thread thread = new Thread(new Runnable(){
+				public void run()
+				{
+					if(m_ImagePath != null){
+	            		try{
+	            	      	m_MagickImage = new MagickImage(new ImageInfo(m_ImagePath));
+	            		}catch (MagickException e) {
+	            			Log.w(LOGTAG, "MagickException - new MagickImage", e);
+	            			m_MagickImage = null;
+	            			m_Bitmap = null;
+	            		}
+	            		if(m_MagickImage != null){
+	            			try{
+	            				// reduce bitmap size if needed:
+	            				m_Bitmap = MagickBitmap.ToReducedBitmap(m_MagickImage, MAX_BITMAP_DIMENSION);
+	            				// m_Bitmap = MagickBitmap.ToBitmap(m_MagickImage);
+	            	      	}catch (MagickException e) { // will never happen
+	            	      		Log.w(LOGTAG, "MagickException - ToBitmap", e);
+	            	      		m_Bitmap = null; // but image is loaded
+	            	      	}
+	            			if(m_Bitmap == null)
+	            				Log.d(LOGTAG, "ToBitmap null");
+	            			else
+	            				Log.d(LOGTAG, "ToBitmap ok");
+	            		}
+	            	}	
+					
+					// set as effect image, too:
+        	      	m_EffectImage = m_MagickImage;
+        	      	
+					m_This.runOnUiThread(new Runnable(){
+						public void run()
+						{
+							enableUI(true);
+							// set no effect:
+							m_SpinEffect.setSelection(0);
+		            		
+			            	if(m_Bitmap != null){
+			            		// show image:
+			            		m_ImageView.setImageBitmap(m_Bitmap);
+			            		showStatus("Done");
+			            		Log.d(LOGTAG, "Load success");
+			            	}
+			            	else{
+			            		if(m_MagickImage == null){
+				            		m_ImageView.setImageDrawable(getResources().getDrawable(android.R.drawable.ic_dialog_alert));
+				            		showStatus("Load failed");
+				            		Log.d(LOGTAG, "Load failed");
+			            		}
+			            		else{
+			            			m_ImageView.setImageDrawable(getResources().getDrawable(android.R.drawable.gallery_thumb));
+				            		showStatus("Can't display loaded image");
+				            		Log.d(LOGTAG, "Can't display loaded image");
+			            		}
+			            	}
+						}
+					});
+				}
+			});
+		
+		thread.start();
+	}	
+	
+
+	// AsyncTask version:
+	/*
 	private void loadImage()
 	{
 		Log.d(LOGTAG, "loadImage()");
@@ -166,11 +268,17 @@ public class AndroidMagickActivity extends Activity
             	
             	if(m_ImagePath != null){
             		try{
-            	      	if((m_MagickImage = new MagickImage(new ImageInfo(m_ImagePath))) != null) 
-            	      		bitmap = MagickBitmap.ToBitmap(m_MagickImage);
+            	      	if((m_MagickImage = new MagickImage(new ImageInfo(m_ImagePath))) != null){ 
+            	      		//bitmap = MagickBitmap.ToBitmap(m_MagickImage);
+            	      		
+            	      		// testing:
+            	      		bitmap = null;
+            	      		m_MagickImage = null;
+            	      	}
             	      	// set as effect image, too:
             	      	m_EffectImage = m_MagickImage;
             		} catch (MagickException e) {
+            		//} catch (Exception e) {
             			Log.w(LOGTAG, "image create", e);
             			m_EffectImage = null;
             			return null;
@@ -199,6 +307,7 @@ public class AndroidMagickActivity extends Activity
             }
         }.execute();
 	}
+	*/
 	
 	private void applyEffectAsync(final int pos)
 	{
@@ -239,6 +348,8 @@ public class AndroidMagickActivity extends Activity
 		int effect = 0;
 		Bitmap bitmap = null;
 		m_EffectImage = null;
+		
+		Log.d(LOGTAG, "applyEffect()");
 		
 		try {
 		switch (pos) {
@@ -283,8 +394,10 @@ public class AndroidMagickActivity extends Activity
 		// if all else fails, default to original image:
 		if(m_EffectImage == null)
 			m_EffectImage = m_MagickImage;
-			
-		bitmap = MagickBitmap.ToBitmap(m_EffectImage);
+		
+		// reduce image if needed:
+		bitmap = MagickBitmap.ToReducedBitmap(m_EffectImage, MAX_BITMAP_DIMENSION);
+		// bitmap = MagickBitmap.ToBitmap(m_EffectImage);
 		
 		} catch (MagickException e) {
 			Log.w(LOGTAG, "applyEffect()", e);

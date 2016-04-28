@@ -110,6 +110,37 @@ static inline int open_utf8(const char *path,int flags,int mode)
 #endif
 }
 
+/*
+////////////////////////////////////////////////////////////
+//
+//	2016/04/27 D.Slamnig added for large file support
+//
+////////////////////////////////////////////////////////////
+static inline int open_utf8_64(const char *path,int flags,int mode)
+{
+#if !defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__CYGWIN__) || defined(__MINGW32__)
+  return(open64(path,flags,mode));
+#else
+   int
+     count,
+     status;
+
+   WCHAR
+     *path_wide;
+
+   path_wide=(WCHAR *) NULL;
+   count=MultiByteToWideChar(CP_UTF8,0,path,-1,NULL,0);
+   path_wide=(WCHAR *) AcquireQuantumMemory(count,sizeof(*path_wide));
+   if (path_wide == (WCHAR *) NULL)
+     return(-1);
+   count=MultiByteToWideChar(CP_UTF8,0,path,-1,path_wide,count);
+   status=_wopen64(path_wide,flags,mode);
+   path_wide=RelinquishMagickMemory(path_wide);
+   return(status);
+#endif
+}
+*/
+
 static inline FILE *popen_utf8(const char *command,const char *type)
 {
 #if !defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__CYGWIN__) || defined(__MINGW32__)

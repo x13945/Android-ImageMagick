@@ -70,6 +70,16 @@
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
 #include "zlib.h"
 #endif
+
+// 2016/04/17 D.Slamnig added:
+#define _FILE_OFFSET_BITS 64
+//
+#include <android/log.h>
+#define APPNAME "Magick"
+#define LOG(a) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a);
+#define LOG2(a,b) __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, a, b);
+//
+
 
 /*
   Define declarations.
@@ -625,12 +635,18 @@ static inline MagickSizeType MagickMin(const MagickSizeType x,
   return(y);
 }
 
+///////////////////////////////////////////////////////////////
+//
+// 2016/04/22 D.Slamnig modified for large files on Android
+//
+///////////////////////////////////////////////////////////////
 static MagickBooleanType OpenPixelCacheOnDisk(CacheInfo *cache_info,
   const MapMode mode)
 {
   int
     file;
 
+  //LOG("OpenPixelCacheOnDisk()");
   /*
     Open pixel cache on disk.
   */
@@ -641,36 +657,48 @@ static MagickBooleanType OpenPixelCacheOnDisk(CacheInfo *cache_info,
       return(MagickTrue);  /* cache already open */
     }
   LimitPixelCacheDescriptors();
+
+  //LOG2("- Cache filename: %s", cache_info->cache_filename);
+
   if (*cache_info->cache_filename == '\0')
     file=AcquireUniqueFileResource(cache_info->cache_filename);
   else
     switch (mode)
     {
+       // large file open - no open64:
       case ReadMode:
       {
+        // file=open_utf8_64(cache_info->cache_filename,O_RDONLY | O_BINARY,0);
         file=open_utf8(cache_info->cache_filename,O_RDONLY | O_BINARY,0);
         break;
       }
       case WriteMode:
       {
+    	//file=open_utf8_64(cache_info->cache_filename,O_WRONLY | O_CREAT |
+    	//            O_BINARY | O_EXCL,S_MODE);
         file=open_utf8(cache_info->cache_filename,O_WRONLY | O_CREAT |
           O_BINARY | O_EXCL,S_MODE);
         if (file == -1)
+          // file=open_utf8_64(cache_info->cache_filename,O_WRONLY | O_BINARY,S_MODE);
           file=open_utf8(cache_info->cache_filename,O_WRONLY | O_BINARY,S_MODE);
         break;
       }
       case IOMode:
       default:
       {
-        file=open_utf8(cache_info->cache_filename,O_RDWR | O_CREAT | O_BINARY |
+    	//file=open_utf8_64(cache_info->cache_filename,O_RDWR | O_CREAT | O_BINARY |
+    	//  O_EXCL,S_MODE);
+    	file=open_utf8(cache_info->cache_filename,O_RDWR | O_CREAT | O_BINARY |
           O_EXCL,S_MODE);
         if (file == -1)
+          // file=open_utf8_64(cache_info->cache_filename,O_RDWR | O_BINARY,S_MODE);
           file=open_utf8(cache_info->cache_filename,O_RDWR | O_BINARY,S_MODE);
         break;
       }
     }
   if (file == -1)
     {
+	  LOG("- file open failed");
       UnlockSemaphoreInfo(cache_info->disk_semaphore);
       return(MagickFalse);
     }
@@ -681,6 +709,11 @@ static MagickBooleanType OpenPixelCacheOnDisk(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+////////////////////////////////
+//
+// 2016/04/22 D.Slamnig modified
+//
+////////////////////////////////
 static inline MagickOffsetType ReadPixelCacheRegion(CacheInfo *cache_info,
   const MagickOffsetType offset,const MagickSizeType length,
   unsigned char *restrict buffer)
@@ -692,6 +725,7 @@ static inline MagickOffsetType ReadPixelCacheRegion(CacheInfo *cache_info,
     count;
 
   cache_info->timestamp=time(0);
+/*
 #if !defined(MAGICKCORE_HAVE_PREAD)
   LockSemaphoreInfo(cache_info->disk_semaphore);
   if (lseek(cache_info->file,offset,SEEK_SET) < 0)
@@ -700,9 +734,14 @@ static inline MagickOffsetType ReadPixelCacheRegion(CacheInfo *cache_info,
       return((MagickOffsetType) -1);
     }
 #endif
+*/
   count=0;
   for (i=0; i < (MagickOffsetType) length; i+=count)
   {
+	  // Android only:
+	  count=pread64(cache_info->file,buffer+i,(size_t) MagickMin(length-i,
+	        (MagickSizeType) SSIZE_MAX),(off64_t) (offset+i));
+/*
 #if !defined(MAGICKCORE_HAVE_PREAD)
     count=read(cache_info->file,buffer+i,(size_t) MagickMin(length-i,
       (MagickSizeType) SSIZE_MAX));
@@ -710,6 +749,7 @@ static inline MagickOffsetType ReadPixelCacheRegion(CacheInfo *cache_info,
     count=pread(cache_info->file,buffer+i,(size_t) MagickMin(length-i,
       (MagickSizeType) SSIZE_MAX),(off_t) (offset+i));
 #endif
+*/
     if (count > 0)
       continue;
     count=0;
@@ -725,6 +765,11 @@ static inline MagickOffsetType ReadPixelCacheRegion(CacheInfo *cache_info,
   return(i);
 }
 
+//////////////////////////////////////////////
+//
+// 2016/04/22 D.Slamnig modified:
+//
+//////////////////////////////////////////////
 static inline MagickOffsetType WritePixelCacheRegion(CacheInfo *cache_info,
   const MagickOffsetType offset,const MagickSizeType length,
   const unsigned char *restrict buffer)
@@ -735,31 +780,61 @@ static inline MagickOffsetType WritePixelCacheRegion(CacheInfo *cache_info,
   ssize_t
     count;
 
+  //LOG("WritePixelCacheRegion()");
+  //LOG2("- offset: %lld", offset);
+  //LOG2("- length: %lld", length);
+
   cache_info->timestamp=time(0);
+
+/*
 #if !defined(MAGICKCORE_HAVE_PWRITE)
   LockSemaphoreInfo(cache_info->disk_semaphore);
   if (lseek(cache_info->file,offset,SEEK_SET) < 0)
     {
+	  //
+	  LOG("- lseek failed");
+	  //
       UnlockSemaphoreInfo(cache_info->disk_semaphore);
       return((MagickOffsetType) -1);
     }
 #endif
+*/
   count=0;
   for (i=0; i < (MagickOffsetType) length; i+=count)
   {
+///////////////////////////////////
+// 	Android only:
+	//LOG2("- call pwrite64, i: %lld", i);
+
+	count=pwrite64(cache_info->file,buffer+i,(size_t) MagickMin(length-i,
+		   (MagickSizeType) SSIZE_MAX),(off64_t) (offset+i));
+
+	//LOG2("- count: %lld", count);
+////////////////////////////////////
+/*
 #if !defined(MAGICKCORE_HAVE_PWRITE)
+	  LOG2("- call write, i: %ld", (long) i);
     count=write(cache_info->file,buffer+i,(size_t) MagickMin(length-i,
       (MagickSizeType) SSIZE_MAX));
 #else
+    LOG2("- call pwrite, i: %ld", (long) i);
     count=pwrite(cache_info->file,buffer+i,(size_t) MagickMin(length-i,
       (MagickSizeType) SSIZE_MAX),(off_t) (offset+i));
+    LOG2("- count: %ld", (long) count);
 #endif
+*/
+//////
     if (count > 0)
       continue;
     count=0;
     if (errno != EINTR)
       {
-        i=(-1);
+    	//
+    	LOG2("- errno: %d", (int)errno);
+    	//
+    	// D.S. maybe better:
+    	i = ((MagickOffsetType) -1);
+    	// i=(-1);
         break;
       }
   }
@@ -3976,6 +4051,11 @@ static inline void AllocatePixelCachePixels(CacheInfo *cache_info)
     }
 }
 
+////////////////////////////////
+//
+// 2016/04/22 D.Slamnig modified
+//
+////////////////////////////////
 static MagickBooleanType ExtendCache(Image *image,MagickSizeType length)
 {
   CacheInfo
@@ -3985,6 +4065,11 @@ static MagickBooleanType ExtendCache(Image *image,MagickSizeType length)
     count,
     extent,
     offset;
+
+  //
+  LOG("ExtendCache()");
+  LOG2("- length: %lld", length);
+  //
 
   cache_info=(CacheInfo *) image->cache;
   if (image->debug != MagickFalse)
@@ -3999,15 +4084,31 @@ static MagickBooleanType ExtendCache(Image *image,MagickSizeType length)
         cache_info->cache_filename,cache_info->file,format);
       (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",message);
     }
-  if (length != (MagickSizeType) ((MagickOffsetType) length))
-    return(MagickFalse);
+  if (length != (MagickSizeType) ((MagickOffsetType) length)){
+	  //
+	  LOG2("- length problem: %lld", length);
+	  //
+	  return(MagickFalse);
+  }
+
   extent=(MagickOffsetType) lseek(cache_info->file,0,SEEK_END);
-  if (extent < 0)
-    return(MagickFalse);
+  if (extent < 0){
+	  //
+	  LOG("- lseek to end problem");
+	  //
+	  return(MagickFalse);
+  }
   if ((MagickSizeType) extent >= length)
     return(MagickTrue);
   offset=(MagickOffsetType) length-1;
   count=WritePixelCacheRegion(cache_info,offset,1,(const unsigned char *) "");
+  //
+  LOG2("- count: %ld", (long)count);
+  //
+
+  // changed error checking:
+  //return(count == (MagickOffsetType) -1 ? MagickFalse : MagickTrue);
+  // is this totally wrong?:
   return(count == (MagickOffsetType) 1 ? MagickTrue : MagickFalse);
 }
 
@@ -4032,6 +4133,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   size_t
     columns,
     packet_size;
+
+  LOG("OpenPixelCache()");
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickSignature);
@@ -4063,10 +4166,17 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
       return(MagickTrue);
     }
   number_pixels=(MagickSizeType) cache_info->columns*cache_info->rows;
+  //
+  //LOG2("- number_pixels: %lld", number_pixels);
+  //
   packet_size=sizeof(PixelPacket);
   if (cache_info->active_index_channel != MagickFalse)
     packet_size+=sizeof(IndexPacket);
   length=number_pixels*packet_size;
+  //
+  //LOG2("- length: %lld", length);
+  //
+
   columns=(size_t) (length/cache_info->rows/packet_size);
   if (cache_info->columns != columns)
     ThrowBinaryException(ResourceLimitError,"PixelCacheAllocationFailed",
@@ -4074,6 +4184,15 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   cache_info->length=length;
   status=AcquireMagickResource(AreaResource,cache_info->length);
   length=number_pixels*(sizeof(PixelPacket)+sizeof(IndexPacket));
+
+  //
+  LOG2("- cache_info->columns: %ld", (long)cache_info->columns);
+  LOG2("- cache_info->rows: %ld", (long)cache_info->rows);
+  LOG2("- cache_info->offset: %lld", cache_info->offset);
+  LOG2("- cache_info->length: %lld", cache_info->length);
+  LOG2("- length: %lld", length);
+  //
+
   if ((status != MagickFalse) && (length == (MagickSizeType) ((size_t) length)))
     {
       status=AcquireMagickResource(MemoryResource,cache_info->length);
@@ -4088,6 +4207,9 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               /*
                 Create memory pixel cache.
               */
+        	  //
+        	  LOG("- create memory pixel cache");
+        	  //
               if (image->debug != MagickFalse)
                 {
                   (void) FormatMagickSize(cache_info->length,MagickTrue,
@@ -4121,6 +4243,11 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   /*
     Create pixel cache on disk.
   */
+
+  //
+  //LOG2("- #2 cache_info->length: %lld", cache_info->length);
+  //
+
   status=AcquireMagickResource(DiskResource,cache_info->length);
   if (status == MagickFalse)
     {
@@ -4128,6 +4255,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
         "CacheResourcesExhausted","`%s'",image->filename);
       return(MagickFalse);
     }
+
+  LOG("- open disk pixel cache");
   if (OpenPixelCacheOnDisk(cache_info,mode) == MagickFalse)
     {
       RelinquishMagickResource(DiskResource,cache_info->length);
@@ -4135,6 +4264,14 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
         image->filename);
       return(MagickFalse);
     }
+
+  //
+  //LOG("-> pass to Extend cache:");
+  //LOG2("- cache_info->offset: %lld", cache_info->offset);
+  //LOG2("- #3 cache_info->length: %lld", cache_info->length);
+  //LOG2("- sum: %lld", cache_info->offset + cache_info->length);
+  //
+
   status=ExtendCache(image,(MagickSizeType) cache_info->offset+
     cache_info->length);
   if (status == MagickFalse)

@@ -15,6 +15,12 @@
 
   MagickCore exception methods.
 */
+//////////////////////////////////////////////////////////////////////////////
+//
+// 2016/04/20 D.Slamnig modified to retrieve maximum severity exception
+// during an operation. Used to throw MagickException in JNI code.
+//
+//////////////////////////////////////////////////////////////////////////////
 #ifndef _MAGICKCORE_EXCEPTION_H
 #define _MAGICKCORE_EXCEPTION_H
 
@@ -170,6 +176,27 @@ extern MagickExport void
 
 extern MagickExport WarningHandler
   SetWarningHandler(WarningHandler);
+
+///////////////////////////////////////////////////////////////////////
+//
+// 2016/04/20 D.Slamnig added to retrieve maximum severity exception
+// during an operation:
+//
+extern MagickExport void
+	ClearNativeException(void);
+
+extern MagickExport ExceptionInfo*
+	GetNativeException(void);
+
+extern MagickExport int
+	IsNativeExceptionError(void);
+
+extern MagickExport int
+	GetNativeExceptionSeverity(void);
+
+extern MagickExport char*
+	GetNativeExceptionReason(void);
+////////////////////////////////////////////////////////////////////////
 
 #if defined(__cplusplus) || defined(c_plusplus)
 }
